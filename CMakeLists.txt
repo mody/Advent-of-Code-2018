@@ -28,3 +28,6 @@ target_compile_features(puzzle_18 PRIVATE cxx_std_17)
 
 add_executable(puzzle_19 puzzle_19.cc)
 target_compile_features(puzzle_19 PRIVATE cxx_std_17)
+
+add_executable(puzzle_20 puzzle_20.cc)
+target_compile_features(puzzle_20 PRIVATE cxx_std_17)
