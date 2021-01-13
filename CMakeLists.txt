@@ -31,3 +31,7 @@ target_compile_features(puzzle_19 PRIVATE cxx_std_17)
 
 add_executable(puzzle_20 puzzle_20.cc)
 target_compile_features(puzzle_20 PRIVATE cxx_std_17)
+
+add_executable(puzzle_22 puzzle_22.cc)
+target_compile_features(puzzle_22 PRIVATE cxx_std_17)
+#  target_link_libraries(puzzle_22 -Wl,-z -Wl,stack-size=268435456)
