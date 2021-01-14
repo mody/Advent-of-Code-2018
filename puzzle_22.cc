@@ -3,8 +3,11 @@
 #include <iomanip>
 #include <iostream>
 #include <limits>
+#include <queue>
 #include <unordered_map>
 #include <unordered_set>
+
+#define BOUNDARY 1
 
 enum {
     NOTHING = 0,
@@ -116,8 +119,6 @@ struct Cell {
     }
 };
 
-#define BOUNDARY 40
-
 struct World
 {
     World(long const depth, Point _target) : max_x{_target.x+BOUNDARY}, max_y{_target.y+BOUNDARY}, target(std::move(_target))
@@ -154,13 +155,91 @@ struct World
         return l;
     }
 
-    bool can_move(Point p) {
-        if ( p == Point{0, 0} ) {
-            return false;
-        }
-        if (p.x < 0 || p.x >= max_x || p.y < 0 || p.y >= max_y) {
-            return false;
-        }
+    // bool can_move(Point p) {
+    //     Cell const& c0 = at(p);
+    //     if (c0.type == ROCKY && p.holds == NOTHING) {
+    //         // std::cout << "Can't move there\n";
+    //         return false;
+    //     }
+    //     if (c0.type == WET && p.holds == TORCH) {
+    //         // std::cout << "Can't move there\n";
+    //         return false;
+    //     }
+    //     if (c0.type == NARROW && p.holds == CLIMBING) {
+    //         // std::cout << "Can't move there\n";
+    //         return false;
+    //     }
+    //     if ((c0.duration && c0.duration <= p.duration) || (shortest < p.duration)) {
+    //         // std::cout << "Slow to move there\n";
+    //         return false;
+    //     }
+    //     return true;
+    // }
+
+    // void step(Point p0, unsigned level) {
+    //     Cell& c0 = at(p0);
+    //     const Point prev{p0.prev_x, p0.prev_y};
+
+    //     // std::cout << "@ " << p0.to_string() << ", cell=" << c0.to_string() << ", level=" << level << "\n";
+
+    //     if ((c0.duration && c0.duration <= p0.duration) || (shortest < p0.duration)) {
+    //         // std::cout << "took longer\b";
+    //         // our path is longer
+    //         return;
+    //     }
+    //     c0.duration = p0.duration;
+    //     // dump_dur();
+
+    //     if (p0 == target) {
+    //         shortest = std::min(shortest, c0.duration + 7); // switch to torch
+    //     }
+
+    //     // try all combinations
+    //     int other_tool = -1;
+    //     if (c0.type == ROCKY) {
+    //         assert(p0.holds == TORCH || p0.holds == CLIMBING);
+    //         other_tool = (p0.holds == TORCH ? CLIMBING : TORCH);
+
+    //     } else if (c0.type == WET) {
+    //         assert(p0.holds == CLIMBING || p0.holds == NOTHING);
+    //         other_tool = (p0.holds == NOTHING ? CLIMBING : NOTHING);
+
+    //     } else if (c0.type == NARROW) {
+    //         assert(p0.holds == TORCH || p0.holds == NOTHING);
+    //         other_tool = (p0.holds == NOTHING ? TORCH : NOTHING);
+    //     }
+    //     assert(other_tool >= NOTHING);
+    //     assert(other_tool <= TORCH);
+
+    //     for (Point p1 : {p0.right(), p0.down(), p0.left(), p0.up()}) {
+    //         if ( p1 == Point{0, 0} ) {
+    //             continue;
+    //         }
+    //         if (p1.x < 0 || p1.x >= max_x || p1.y < 0 || p1.y >= max_y) {
+    //             continue;
+    //         }
+    //         if (p1 == prev) {
+    //             // std::cout << "Skip return path\n";
+    //             continue;
+    //         }
+    //         for (int tool : {p0.holds, other_tool}) {
+    //             p1.duration = p0.duration + 1 + (tool != p0.holds ? 7 : 0);
+    //             p1.holds = tool;
+    //             // std::cout << "try " << p1.to_string() << "\n";
+    //             if (can_move(p1)) {
+    //                 step(p1, level+1);
+    //             }
+    //         }
+    //     }
+    // }
+
+    // unsigned long rescue() {
+    //     shortest = std::numeric_limits<unsigned int>::max();
+    //     step({}, 0);
+    //     return shortest;
+    // }
+
+    bool can_move2(Point p) {
         Cell const& c0 = at(p);
         if (c0.type == ROCKY && p.holds == NOTHING) {
             // std::cout << "Can't move there\n";
@@ -174,69 +253,85 @@ struct World
             // std::cout << "Can't move there\n";
             return false;
         }
-        if ((c0.duration && c0.duration <= p.duration) || (shortest < p.duration)) {
-            // std::cout << "Slow to move there\n";
-            return false;
-        }
         return true;
     }
 
-    void step(Point p0, unsigned level) {
-        Cell& c0 = at(p0);
-        const Point prev{p0.prev_x, p0.prev_y};
+    unsigned long rescue2() {
+        auto shortest = [](Point const& a, Point const& b) {
+            return a.duration > b.duration;
+        };
+        std::priority_queue<Point, std::vector<Point>, decltype(shortest)> qq(shortest);
 
-        // std::cout << "@ " << p0.to_string() << ", cell=" << c0.to_string() << ", level=" << level << "\n";
+        qq.push({});
 
-        if ((c0.duration && c0.duration <= p0.duration) || (shortest < p0.duration)) {
-            // std::cout << "took longer\b";
-            // our path is longer
-            return;
-        }
-        c0.duration = p0.duration;
-        // dump_dur();
+        std::unordered_set<Point> visited;
+        while(!qq.empty()) {
+            {
+                auto q2 = qq;
+                std::cout << "qq: ";
+                while(!q2.empty()) {
+                    std::cout << q2.top().to_string() << ",";
+                    q2.pop();
+                }
+                std::cout << "\n";
+            }
+            Point p0{qq.top()};
+            qq.pop();
+            if (visited.count(p0)) {
+                continue;
+            }
 
-        if (p0 == target) {
-            shortest = std::min(shortest, c0.duration + 7); // switch to torch
-        }
+            if (p0 == target) {
+                target.duration = p0.duration + 7;
+                break;
+            }
 
-        // try all combinations
-        int other_tool = -1;
-        if (c0.type == ROCKY) {
-            assert(p0.holds == TORCH || p0.holds == CLIMBING);
-            other_tool = (p0.holds == TORCH ? CLIMBING : TORCH);
+            visited.insert(p0);
+            Cell& c0 = at(p0);
+            c0.duration = p0.duration;
 
-        } else if (c0.type == WET) {
-            assert(p0.holds == CLIMBING || p0.holds == NOTHING);
-            other_tool = (p0.holds == NOTHING ? CLIMBING : NOTHING);
+            std::cout << "@ " << p0.to_string() << "\n";
+            dump_dur();
 
-        } else if (c0.type == NARROW) {
-            assert(p0.holds == TORCH || p0.holds == NOTHING);
-            other_tool = (p0.holds == NOTHING ? TORCH : NOTHING);
-        }
-        assert(other_tool >= NOTHING);
-        assert(other_tool <= TORCH);
+            // try all combinations
+            int other_tool = -1;
+            if (c0.type == ROCKY) {
+                assert(p0.holds == TORCH || p0.holds == CLIMBING);
+                other_tool = (p0.holds == TORCH ? CLIMBING : TORCH);
 
-        for (int tool : {p0.holds, other_tool}) {
+            } else if (c0.type == WET) {
+                assert(p0.holds == CLIMBING || p0.holds == NOTHING);
+                other_tool = (p0.holds == NOTHING ? CLIMBING : NOTHING);
+
+            } else if (c0.type == NARROW) {
+                assert(p0.holds == TORCH || p0.holds == NOTHING);
+                other_tool = (p0.holds == NOTHING ? TORCH : NOTHING);
+            }
+            assert(other_tool >= NOTHING);
+            assert(other_tool <= TORCH);
+
             for (Point p1 : {p0.right(), p0.down(), p0.left(), p0.up()}) {
-                if (p1 == prev) {
-                    // std::cout << "Skip return path\n";
+                if (p1.x < 0 || p1.x >= max_x || p1.y < 0 || p1.y >= max_y) {
                     continue;
                 }
-                p1.duration = p0.duration + 1 + (tool != p0.holds ? 7 : 0);
-                p1.holds = tool;
-                // std::cout << "try " << p1.to_string() << "\n";
-                if (can_move(p1)) {
-                    step(p1, level+1);
+                // if (visited.count(p1)) {
+                //     continue;
+                // }
+                for (int tool : {p0.holds, other_tool}) {
+                    p1.duration = p0.duration + 1 + (tool != p0.holds ? 7 : 0);
+                    p1.holds = tool;
+                    // std::cout << "try " << p1.to_string() << "\n";
+                    if (can_move2(p1)) {
+                        std::cout << "? " << p1.to_string() << "\n";
+                        qq.push(std::move(p1));
+                    }
                 }
             }
         }
+
+        return target.duration;
     }
 
-    unsigned long rescue() {
-        shortest = std::numeric_limits<unsigned int>::max();
-        step({}, 0);
-        return shortest;
-    }
 
 
     Cell& get(Point const& p) { return mapa[p]; }
@@ -301,17 +396,18 @@ int main()
 {
     // depth: 510
     // target: 10,10
-    // World mapa(510, {10, 10});
-    // mapa.dump();
+    World mapa(510, {10, 10});
     // mapa.dump_ero();
 
     // depth: 5355
     // target: 14,796
-    World mapa(5355, {14, 796});
+    // World mapa(5355, {14, 796});
+
+    mapa.dump();
 
     std::cout << "1 Result=" << mapa.risk_level() << "\n";
 
-    auto shortest = mapa.rescue();
+    auto shortest = mapa.rescue2();
     std::cout << "2 Result=" << shortest << "\n";
 
     return 0;
