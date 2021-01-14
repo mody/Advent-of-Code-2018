@@ -1,13 +1,13 @@
 #include <boost/container_hash/hash.hpp>
 
+#include <array>
 #include <iomanip>
 #include <iostream>
 #include <limits>
 #include <queue>
-#include <unordered_map>
 #include <unordered_set>
 
-#define BOUNDARY 1
+#define BOUNDARY 5
 
 enum {
     NOTHING = 0,
@@ -25,28 +25,26 @@ struct Cell;
 
 struct Point {
     long x = 0, y = 0;
-    long prev_x = 0, prev_y = 0;
-    unsigned int duration = 0;
     int holds = TORCH;
+    unsigned int duration = 0;
 
     Point left() const noexcept {
-        return {x - 1, y, x, y, duration, holds};
+        return {x - 1, y, holds, duration};
     }
 
     Point right() const noexcept {
-        return {x + 1, y, x, y, duration, holds};
+        return {x + 1, y, holds, duration};
     }
 
     Point up() const noexcept {
-        return {x, y - 1, x, y, duration, holds};
+        return {x, y - 1, holds, duration};
     }
 
     Point down() const noexcept {
-        return {x, y + 1, x, y, duration, holds};
+        return {x, y + 1, holds, duration};
     }
 
     bool operator==(Point const& o) const noexcept { return x == o.x && y == o.y; }
-    bool operator!=(Point const& o) const noexcept { return ! operator==(o); }
 
     std::string to_string() const {
         std::string s;
@@ -91,6 +89,7 @@ struct hash<Point>
         size_t seed = 0;
         boost::hash_combine(seed, p.x);
         boost::hash_combine(seed, p.y);
+        boost::hash_combine(seed, p.holds);
         return seed;
     }
 };
@@ -119,12 +118,13 @@ struct Cell {
     }
 };
 
+template<unsigned int MAX_X, unsigned int MAX_Y>
 struct World
 {
-    World(long const depth, Point _target) : max_x{_target.x+BOUNDARY}, max_y{_target.y+BOUNDARY}, target(std::move(_target))
+    World(long const depth, Point _target) : target(std::move(_target))
     {
-        for (long y = 0; y < max_y; ++y) {
-            for (long x = 0; x < max_x; ++x) {
+        for (long y = 0; y < MAX_Y; ++y) {
+            for (long x = 0; x < MAX_X; ++x) {
                 Cell& c = get({x, y});
                 uint64_t geo_index = 0;
                 if (y == 0 && x == 0) {
@@ -155,94 +155,8 @@ struct World
         return l;
     }
 
-    // bool can_move(Point p) {
-    //     Cell const& c0 = at(p);
-    //     if (c0.type == ROCKY && p.holds == NOTHING) {
-    //         // std::cout << "Can't move there\n";
-    //         return false;
-    //     }
-    //     if (c0.type == WET && p.holds == TORCH) {
-    //         // std::cout << "Can't move there\n";
-    //         return false;
-    //     }
-    //     if (c0.type == NARROW && p.holds == CLIMBING) {
-    //         // std::cout << "Can't move there\n";
-    //         return false;
-    //     }
-    //     if ((c0.duration && c0.duration <= p.duration) || (shortest < p.duration)) {
-    //         // std::cout << "Slow to move there\n";
-    //         return false;
-    //     }
-    //     return true;
-    // }
-
-    // void step(Point p0, unsigned level) {
-    //     Cell& c0 = at(p0);
-    //     const Point prev{p0.prev_x, p0.prev_y};
-
-    //     // std::cout << "@ " << p0.to_string() << ", cell=" << c0.to_string() << ", level=" << level << "\n";
-
-    //     if ((c0.duration && c0.duration <= p0.duration) || (shortest < p0.duration)) {
-    //         // std::cout << "took longer\b";
-    //         // our path is longer
-    //         return;
-    //     }
-    //     c0.duration = p0.duration;
-    //     // dump_dur();
-
-    //     if (p0 == target) {
-    //         shortest = std::min(shortest, c0.duration + 7); // switch to torch
-    //     }
-
-    //     // try all combinations
-    //     int other_tool = -1;
-    //     if (c0.type == ROCKY) {
-    //         assert(p0.holds == TORCH || p0.holds == CLIMBING);
-    //         other_tool = (p0.holds == TORCH ? CLIMBING : TORCH);
-
-    //     } else if (c0.type == WET) {
-    //         assert(p0.holds == CLIMBING || p0.holds == NOTHING);
-    //         other_tool = (p0.holds == NOTHING ? CLIMBING : NOTHING);
-
-    //     } else if (c0.type == NARROW) {
-    //         assert(p0.holds == TORCH || p0.holds == NOTHING);
-    //         other_tool = (p0.holds == NOTHING ? TORCH : NOTHING);
-    //     }
-    //     assert(other_tool >= NOTHING);
-    //     assert(other_tool <= TORCH);
-
-    //     for (Point p1 : {p0.right(), p0.down(), p0.left(), p0.up()}) {
-    //         if ( p1 == Point{0, 0} ) {
-    //             continue;
-    //         }
-    //         if (p1.x < 0 || p1.x >= max_x || p1.y < 0 || p1.y >= max_y) {
-    //             continue;
-    //         }
-    //         if (p1 == prev) {
-    //             // std::cout << "Skip return path\n";
-    //             continue;
-    //         }
-    //         for (int tool : {p0.holds, other_tool}) {
-    //             p1.duration = p0.duration + 1 + (tool != p0.holds ? 7 : 0);
-    //             p1.holds = tool;
-    //             // std::cout << "try " << p1.to_string() << "\n";
-    //             if (can_move(p1)) {
-    //                 step(p1, level+1);
-    //             }
-    //         }
-    //     }
-    // }
-
-    // unsigned long rescue() {
-    //     shortest = std::numeric_limits<unsigned int>::max();
-    //     step({}, 0);
-    //     return shortest;
-    // }
 
     bool can_move2(Point const& p) const {
-        if (p.x < 0 || p.x >= max_x || p.y < 0 || p.y >= max_y) {
-            return false;
-        }
         Cell const& c0 = at(p);
         if (c0.type == ROCKY && p.holds == NOTHING) {
             // std::cout << "Can't move there\n";
@@ -265,40 +179,47 @@ struct World
         };
         std::priority_queue<Point, std::vector<Point>, decltype(shortest)> qq(shortest);
 
-        qq.push({});
+        qq.push(Point{0, 0, TORCH});
 
         std::unordered_set<Point> visited;
+        // visited.insert({0, 0, NOTHING});
+        // visited.insert({0, 0, CLIMBING});
+
         while(!qq.empty()) {
-            {
-                auto q2 = qq;
-                std::cout << "qq: ";
-                while(!q2.empty()) {
-                    std::cout << q2.top().to_string() << ",";
-                    q2.pop();
-                }
-                std::cout << "\n";
-            }
+            // {
+            //     auto q2 = qq;
+            //     std::cout << "qq: ";
+            //     while(!q2.empty()) {
+            //         std::cout << q2.top().to_string() << ",";
+            //         q2.pop();
+            //     }
+            //     std::cout << "\n";
+            // }
             Point p0{qq.top()};
             qq.pop();
 
-            if (p0 == target) {
-                target.duration = p0.duration + 7;
-                break;
-            }
-
             if (!visited.insert(p0).second) {
-                std::cout << " seen " << p0.to_string() << "\n";
+                // std::cout << " seen " << p0.to_string() << "\n";
                 continue;
             }
 
             Cell& c0 = at(p0);
-            // if (c0.duration && c0.duration < p0.duration) {
-            //     continue;
-            // }
-            c0.duration = p0.duration;
+            if (c0.duration && c0.duration < p0.duration) {
+                // noop
+            } else {
+                c0.duration = p0.duration;
+            }
 
-            std::cout << "@ " << p0.to_string() << "\n";
-            dump_dur();
+            if (p0 == target) {
+                target.duration = p0.duration;
+                if (p0.holds != TORCH) {
+                   target.duration += 7;
+                }
+                break;
+            }
+
+            // std::cout << "@ " << p0.to_string() << ", cell=" << c0.to_string() << "\n";
+            // dump_dur();
 
             // try all combinations
             int other_tool = -1;
@@ -316,19 +237,20 @@ struct World
             }
             assert(other_tool == NOTHING || other_tool == TORCH || other_tool == CLIMBING);
 
-            for (Point p1 : {p0.down(), p0.right(), p0.left(), p0.up()}) {
-                if (p1.x < 0 || p1.x >= max_x || p1.y < 0 || p1.y >= max_y) {
+            for (Point p1 : {p0.right(), p0.down(), p0.left(), p0.up()}) {
+                if (p1.x < 0 || p1.x >= MAX_X || p1.y < 0 || p1.y >= MAX_Y) {
                     continue;
                 }
-                for (int tool : {p0.holds, other_tool}) {
-                    p1.holds = tool;
-                    p1.duration = p0.duration + 1 + (tool != p0.holds ? 7 : 0);
-                    if (visited.count(p1) == 0 && can_move2(p1)) {
-                        std::cout << "? " << p1.to_string() << "\n";
-                        qq.push(std::move(p1));
-                    }
+                p1.duration += 1;
+                if (can_move2(p1)) {
+                    // std::cout << "? " << p1.to_string() << "\n";
+                    qq.push(std::move(p1));
                 }
             }
+            Point p1{p0.x, p0.y, other_tool, p0.duration + 7};
+            assert(can_move2(p1));
+            // std::cout << "? " << p1.to_string() << "\n";
+            qq.push(std::move(p1));
         }
 
         return target.duration;
@@ -336,16 +258,16 @@ struct World
 
 
 
-    Cell& get(Point const& p) { return mapa[p]; }
+    Cell& get(Point const& p) { return mapa[p.y][p.x]; }
 
-    Cell const& at(Point const& p) const { return mapa.at(p); }
-    Cell& at(Point const& p) { return mapa.at(p); }
+    Cell const& at(Point const& p) const { return mapa[p.y][p.x]; }
+    Cell& at(Point const& p) { return mapa[p.y][p.x]; }
 
     void dump() const {
-        for (long y = 0; y < max_y; ++y) {
+        for (long y = 0; y < MAX_Y; ++y) {
             std::string line;
-            line.reserve(max_x + 1);
-            for (long x = 0; x < max_x; ++x) {
+            line.reserve(MAX_X + 1);
+            for (long x = 0; x < MAX_X; ++x) {
                 if (x == 0 && y == 0) {
                     line.append("X");
                     continue;
@@ -370,8 +292,8 @@ struct World
     }
 
     void dump_ero() const {
-        for (long y = 0; y < max_y; ++y) {
-            for (long x = 0; x < max_x; ++x) {
+        for (long y = 0; y < MAX_Y; ++y) {
+            for (long x = 0; x < MAX_X; ++x) {
                 std::cout << std::setw(10) << at({x, y}).erosion_level;
             }
             std::cout << "\n";
@@ -379,8 +301,8 @@ struct World
     }
 
     void dump_dur() const {
-        for (long y = 0; y < max_y; ++y) {
-            for (long x = 0; x < max_x; ++x) {
+        for (long y = 0; y < MAX_Y; ++y) {
+            for (long x = 0; x < MAX_X; ++x) {
                 std::cout << std::setw(5) << at({x, y}).duration;
             }
             std::cout << "\n";
@@ -388,8 +310,7 @@ struct World
     }
 
 protected:
-    std::unordered_map<Point, Cell> mapa;
-    long max_x, max_y;
+    std::array<std::array<Cell, MAX_X>, MAX_Y> mapa;
     Point target;
     unsigned int shortest;
 };
@@ -398,14 +319,14 @@ int main()
 {
     // depth: 510
     // target: 10,10
-    World mapa(510, {10, 10});
+    // World<15,15> mapa(510, {10, 10});
     // mapa.dump_ero();
 
     // depth: 5355
     // target: 14,796
-    // World mapa(5355, {14, 796});
+    World<28, 801> mapa(5355, {14, 796});
 
-    mapa.dump();
+    // mapa.dump();
 
     std::cout << "1 Result=" << mapa.risk_level() << "\n";
 
