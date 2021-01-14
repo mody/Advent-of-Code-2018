@@ -11,8 +11,8 @@
 
 enum {
     NOTHING = 0,
-    CLIMBING = 1,
-    TORCH = 2,
+    TORCH = 1,
+    CLIMBING = 2,
 };
 
 enum {
@@ -30,19 +30,19 @@ struct Point {
     int holds = TORCH;
 
     Point left() const noexcept {
-        return {x - 1, y, x, y};
+        return {x - 1, y, x, y, duration, holds};
     }
 
     Point right() const noexcept {
-        return {x + 1, y, x, y};
+        return {x + 1, y, x, y, duration, holds};
     }
 
     Point up() const noexcept {
-        return {x, y - 1, x, y};
+        return {x, y - 1, x, y, duration, holds};
     }
 
     Point down() const noexcept {
-        return {x, y + 1, x, y};
+        return {x, y + 1, x, y, duration, holds};
     }
 
     bool operator==(Point const& o) const noexcept { return x == o.x && y == o.y; }
@@ -239,7 +239,10 @@ struct World
     //     return shortest;
     // }
 
-    bool can_move2(Point p) {
+    bool can_move2(Point const& p) const {
+        if (p.x < 0 || p.x >= max_x || p.y < 0 || p.y >= max_y) {
+            return false;
+        }
         Cell const& c0 = at(p);
         if (c0.type == ROCKY && p.holds == NOTHING) {
             // std::cout << "Can't move there\n";
@@ -257,7 +260,7 @@ struct World
     }
 
     unsigned long rescue2() {
-        auto shortest = [](Point const& a, Point const& b) {
+        auto shortest = [this](Point const& a, Point const& b) {
             return a.duration > b.duration;
         };
         std::priority_queue<Point, std::vector<Point>, decltype(shortest)> qq(shortest);
@@ -277,17 +280,21 @@ struct World
             }
             Point p0{qq.top()};
             qq.pop();
-            if (visited.count(p0)) {
-                continue;
-            }
 
             if (p0 == target) {
                 target.duration = p0.duration + 7;
                 break;
             }
 
-            visited.insert(p0);
+            if (!visited.insert(p0).second) {
+                std::cout << " seen " << p0.to_string() << "\n";
+                continue;
+            }
+
             Cell& c0 = at(p0);
+            // if (c0.duration && c0.duration < p0.duration) {
+            //     continue;
+            // }
             c0.duration = p0.duration;
 
             std::cout << "@ " << p0.to_string() << "\n";
@@ -307,21 +314,16 @@ struct World
                 assert(p0.holds == TORCH || p0.holds == NOTHING);
                 other_tool = (p0.holds == NOTHING ? TORCH : NOTHING);
             }
-            assert(other_tool >= NOTHING);
-            assert(other_tool <= TORCH);
+            assert(other_tool == NOTHING || other_tool == TORCH || other_tool == CLIMBING);
 
-            for (Point p1 : {p0.right(), p0.down(), p0.left(), p0.up()}) {
+            for (Point p1 : {p0.down(), p0.right(), p0.left(), p0.up()}) {
                 if (p1.x < 0 || p1.x >= max_x || p1.y < 0 || p1.y >= max_y) {
                     continue;
                 }
-                // if (visited.count(p1)) {
-                //     continue;
-                // }
                 for (int tool : {p0.holds, other_tool}) {
-                    p1.duration = p0.duration + 1 + (tool != p0.holds ? 7 : 0);
                     p1.holds = tool;
-                    // std::cout << "try " << p1.to_string() << "\n";
-                    if (can_move2(p1)) {
+                    p1.duration = p0.duration + 1 + (tool != p0.holds ? 7 : 0);
+                    if (visited.count(p1) == 0 && can_move2(p1)) {
                         std::cout << "? " << p1.to_string() << "\n";
                         qq.push(std::move(p1));
                     }
