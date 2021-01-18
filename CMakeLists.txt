@@ -37,3 +37,6 @@ target_compile_features(puzzle_22 PRIVATE cxx_std_17)
 
 add_executable(puzzle_23 puzzle_23.cc)
 target_compile_features(puzzle_23 PRIVATE cxx_std_17)
+
+add_executable(puzzle_24 puzzle_24.cc)
+target_compile_features(puzzle_24 PRIVATE cxx_std_17)
